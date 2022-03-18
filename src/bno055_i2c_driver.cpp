@@ -42,6 +42,8 @@ bool BNO055I2CDriver::reset() {
     _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, BNO055_OPERATION_MODE_NDOF);
     std::this_thread::sleep_for(std::chrono::milliseconds(25));
 
+    operation_mode = BNO055_OPERATION_MODE_NDOF;
+
     return true;
 }
 
@@ -65,7 +67,7 @@ void BNO055I2CDriver::init() {
       << " bl:" << _i2c_smbus_read_byte_data(file, BNO055_BL_REV_ID_ADDR) << std::endl;
 
     if(!reset()) {
-	    throw std::runtime_error("chip init failed");
+         throw std::runtime_error("chip init failed");
     }
 }
 
@@ -83,6 +85,58 @@ IMURecord BNO055I2CDriver::read() {
     }
 
     return record;
+}
+
+void BNO055I2CDriver::readCalib(uint8_t * data) {
+
+    if(_i2c_smbus_read_i2c_block_data(file, BNO055_ACCEL_OFFSET_X_LSB_ADDR, 0x16, (uint8_t*)data) != 0x16) {
+        throw std::runtime_error("Calibration data read error");
+    }
+    
+}
+
+
+void  BNO055I2CDriver::writeCalib(uint8_t * data) {
+    // set mode to CONFIG mode
+    _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, BNO055_OPERATION_MODE_CONFIG);
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+
+    if (_i2c_smbus_write_i2c_block_data(file, BNO055_ACCEL_OFFSET_X_LSB_ADDR,  0x16, data) < 0) {
+        throw std::runtime_error("Calibration data write error");
+    } 
+
+
+ 
+
+    // Set mode back to operation mode
+    _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, operation_mode);
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+}
+
+
+void BNO055I2CDriver::setMode(int mode) {
+    if (operation_mode != mode)
+    {
+        // Should set CONIF mode first to change mode?
+        _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, BNO055_OPERATION_MODE_CONFIG);
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        
+        _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, mode);
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+
+        operation_mode = mode;
+    }
+}
+
+int BNO055I2CDriver::getMode() {
+    int mode = _i2c_smbus_read_byte_data(file, BNO055_OPR_MODE_ADDR);
+    return mode;
+}
+
+int BNO055I2CDriver::calibrate() {
+    // Read calib stat data
+    int calib_response = _i2c_smbus_read_byte_data(file, BNO055_CALIB_STAT_ADDR);
+    return calib_response;
 }
 
 }

@@ -1,9 +1,10 @@
 <launch>
-    <node ns="imu" name="imu_node" pkg="imu_bno055" type="bno055_i2c_node" respawn="true" respawn_delay="2">
+    <node ns="imu" name="imu_calib_node" pkg="imu_bno055" type="bno055_i2c_calib_node" respawn="false">
         <param name="device" type="string" value="/dev/i2c-10"/>
         <param name="address" type="int" value="40"/> <!-- 0x28 == 40 is the default for BNO055 -->
         <param name="frame_id" type="string" value="imu"/>
         <param name="operation_mode" type="string" value="IMU" /> <!-- IMU or NDOF -->
         <param name="calib_file_name" type="string" value="imu_calibration_imumode" />
+
     </node>
 </launch>

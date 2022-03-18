@@ -233,10 +233,23 @@ class BNO055I2CDriver {
     bool reset();
     IMURecord read();
 
+    // calibrate IMU
+    int calibrate();
+
+    void readCalib(uint8_t * data);
+    void writeCalib(uint8_t * data);
+    void setMode(int mode);
+
+    int  getMode();
+
+
   private:
     
     // class variables
     int file;
+
+    // operation mode
+    int operation_mode;
 
     // parameters
     std::string device;

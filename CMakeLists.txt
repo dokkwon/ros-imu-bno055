@@ -10,15 +10,24 @@ catkin_package(INCLUDE_DIRS include)
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(bno055_i2c_node src/bno055_i2c_driver.cpp src/bno055_i2c_node.cpp src/watchdog.cpp)
+add_executable(bno055_i2c_calib_node src/bno055_i2c_driver.cpp src/bno055_i2c_calib_node.cpp src/watchdog.cpp)
 #add_dependencies(bno055_i2c_node diagnostic_msgs_gencpp)
 
 include_directories(${catkin_INCLUDE_DIRS})
 
 target_link_libraries(bno055_i2c_node ${catkin_LIBRARIES})
+target_link_libraries(bno055_i2c_calib_node ${catkin_LIBRARIES})
 
 install(TARGETS bno055_i2c_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+install(TARGETS bno055_i2c_calib_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 

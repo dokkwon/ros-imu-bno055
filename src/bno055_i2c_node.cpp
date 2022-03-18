@@ -22,6 +22,8 @@
 
 #include <memory>
 
+#define CALIB_DATA_SIZE 22
+
 class BNO055I2CNode {
     public:
         BNO055I2CNode(int argc, char* argv[]);
@@ -29,6 +31,10 @@ class BNO055I2CNode {
         bool readAndPublish();
         void stop();
         bool onSrvReset(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+        void checkCalibStatus();
+        void showCalibData(uint8_t *cdata);
+
     private:
         ros::NodeHandle* nh;
         ros::NodeHandle* nh_priv;
@@ -38,6 +44,8 @@ class BNO055I2CNode {
         int param_address;
         double param_rate;
         std::string param_frame_id;
+        std::string param_operation_mode;
+        std::string param_calib_file_name;
 
         diagnostic_msgs::DiagnosticStatus current_status;
 
@@ -53,6 +61,7 @@ class BNO055I2CNode {
         watchdog::Watchdog watchdog;
 
         int seq;
+        uint8_t calib_data[CALIB_DATA_SIZE];
 };
 
 BNO055I2CNode::BNO055I2CNode(int argc, char* argv[]) {
@@ -70,6 +79,8 @@ BNO055I2CNode::BNO055I2CNode(int argc, char* argv[]) {
     nh_priv->param("address", param_address, (int)BNO055_ADDRESS_A);
     nh_priv->param("frame_id", param_frame_id, (std::string)"imu");
     nh_priv->param("rate", param_rate, (double)100);
+    nh_priv->param("operation_mode", param_operation_mode, (std::string)"IMU");
+    nh_priv->param("calib_file_name", param_calib_file_name, (std::string)"calibration_imu");
  
     imu = std::make_unique<imu_bno055::BNO055I2CDriver>(param_device, param_address);
 
@@ -125,6 +136,44 @@ BNO055I2CNode::BNO055I2CNode(int argc, char* argv[]) {
 }
 
 void BNO055I2CNode::run() {
+
+    // Set mode
+    if (param_operation_mode.compare("IMU") == 0)
+    {
+        imu->setMode(BNO055_OPERATION_MODE_IMUPLUS); 
+    } else if (param_operation_mode.compare("NDOF") == 0)
+    {
+        imu->setMode(BNO055_OPERATION_MODE_NDOF);
+    } else
+    {
+        std::cerr << "Operation Mode NOT SUPPORTED!!" << std::endl;
+        return;
+    }
+
+    // read calibration file
+    FILE * fp = fopen(param_calib_file_name.c_str(), "rb");
+    if (fp == NULL)
+    {
+        fprintf(stderr, "Cannot find calibration data file. Recommend to calibrate a sensor first\n");
+    } else
+    {
+        if (CALIB_DATA_SIZE != fread(calib_data, sizeof(uint8_t), CALIB_DATA_SIZE, fp))
+        {
+            fprintf(stderr, "Error in reading calibration data file. Recommend to calibrate a sensor again\n");
+        } else
+        {
+            imu->writeCalib(calib_data);
+        }
+
+        fclose(fp);
+    }
+
+    //imu->readCalib(calib_data);
+    //showCalibData(calib_data);
+
+    // Check calibration status
+    checkCalibStatus();
+
     while(ros::ok()) {
         rate->sleep();
         if(readAndPublish()) {
@@ -225,6 +274,75 @@ bool BNO055I2CNode::onSrvReset(std_srvs::Trigger::Request &req, std_srvs::Trigge
         return false;
     }
     return true;
+}
+
+void BNO055I2CNode::checkCalibStatus()
+{
+    uint8_t response = imu->calibrate();
+    
+    uint8_t system_cailb_status = (response >> 6) & 0x03;
+    uint8_t gyro_calib_status   = (response >> 4) & 0x03;
+    uint8_t acce_calib_status   = (response >> 2) & 0x03;
+    uint8_t mag_calib_status    = (response >> 0) & 0x03;
+
+    // Calibration only in IMU mode
+    if (param_operation_mode.compare("IMU") == 0)
+    {
+        std::cerr << "gyro_calib_status: " << (int16_t) gyro_calib_status << ", "
+                  << "acce_calib_status: " << (int16_t) acce_calib_status <<  std::endl;
+
+    } else if (param_operation_mode.compare("NDOF") == 0)
+    {
+        std::cerr << "system_cailb_status: " << (int16_t) system_cailb_status << ", "
+                  << "gyro_calib_status: "   << (int16_t) gyro_calib_status   << ", "
+                  << "acce_calib_status: "   << (int16_t) acce_calib_status   << ", "
+                  << "mag_calib_status: "    << (int16_t) mag_calib_status    << std::endl;
+    }
+} 
+
+void BNO055I2CNode::showCalibData(uint8_t * cdata) 
+{
+    int16_t accel_offset_x, accel_offset_y, accel_offset_z;
+    int16_t mag_offset_x,   mag_offset_y,   mag_offset_z;
+    int16_t gyro_offset_x,  gyro_offset_y,  gyro_offset_z;
+    int16_t accel_radius;
+    int16_t mag_radius;
+
+    accel_offset_x = ((int16_t)cdata[1] << 8) | cdata[0];
+    accel_offset_y = ((int16_t)cdata[3] << 8) | cdata[2];
+    accel_offset_z = ((int16_t)cdata[5] << 8) | cdata[4];
+
+    mag_offset_x   = ((int16_t)cdata[7] << 8) | cdata[6];
+    mag_offset_y   = ((int16_t)cdata[9] << 8) | cdata[8];
+    mag_offset_z   = ((int16_t)cdata[11] << 8) | cdata[10];
+
+    gyro_offset_x  = ((int16_t)cdata[13] << 8) | cdata[12];
+    gyro_offset_y  = ((int16_t)cdata[15] << 8) | cdata[14];
+    gyro_offset_z  = ((int16_t)cdata[17] << 8) | cdata[16];
+
+    accel_radius   = ((int16_t)cdata[19] << 8) | cdata[18];
+    mag_radius     = ((int16_t)cdata[21] << 8) | cdata[20];
+
+    // Print calibration info
+    std::cerr << "[Calibration data]\n" << std::endl; 
+    std::cerr << "accel_offset_x: " << accel_offset_x << std::endl; 
+    std::cerr << "accel_offset_y: " << accel_offset_y << std::endl; 
+    std::cerr << "accel_offset_z: " << accel_offset_z << std::endl; 
+    std::cerr << "\n" << std::endl; 
+    
+    std::cerr << "mag_offset_x: " << mag_offset_x << std::endl; 
+    std::cerr << "mag_offset_y: " << mag_offset_y << std::endl; 
+    std::cerr << "mag_offset_z: " << mag_offset_z << std::endl; 
+    std::cerr << "\n" << std::endl; 
+    
+    std::cerr << "gyro_offset_x: " << gyro_offset_x << std::endl; 
+    std::cerr << "gyro_offset_y: " << gyro_offset_y << std::endl; 
+    std::cerr << "gyro_offset_z: " << gyro_offset_z << std::endl; 
+    std::cerr << "\n" << std::endl; 
+
+    std::cerr << "accel_radius: " << accel_radius << std::endl; 
+    std::cerr << "mag_radius: "   << mag_radius << std::endl;
+    std::cerr << "\n" << std::endl; 
 }
 
 int main(int argc, char *argv[]) {
