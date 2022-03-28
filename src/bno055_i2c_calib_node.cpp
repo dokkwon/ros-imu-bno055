@@ -46,7 +46,6 @@ class BNO055I2CCalibNode {
         std::string param_device;
         int param_address;
         double param_rate;
-        std::string param_frame_id;
         std::string param_operation_mode;
         std::string param_calib_file_name;
 
@@ -67,9 +66,8 @@ BNO055I2CCalibNode::BNO055I2CCalibNode(int argc, char* argv[]) {
         return;
     }
 
-    nh_priv->param("device", param_device, (std::string)"/dev/i2c-1");
+    nh_priv->param("device", param_device, (std::string)"/dev/i2c-10");
     nh_priv->param("address", param_address, (int)BNO055_ADDRESS_A);
-    nh_priv->param("frame_id", param_frame_id, (std::string)"imu");
     nh_priv->param("operation_mode", param_operation_mode, (std::string)"IMU");
     nh_priv->param("calib_file_name", param_calib_file_name, (std::string)"calibration_imu");
  

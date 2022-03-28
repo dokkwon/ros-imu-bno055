@@ -5,6 +5,5 @@
         <param name="frame_id" type="string" value="imu"/>
         <param name="operation_mode" type="string" value="IMU" /> <!-- IMU or NDOF -->
         <param name="calib_file_name" type="string" value="imu_calibration_imumode" />
-
     </node>
 </launch>
